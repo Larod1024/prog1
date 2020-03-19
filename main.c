@@ -9,8 +9,6 @@
 
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 
-extern char* strdup(const char*);
-
 typedef struct
 {
     int n;
@@ -31,21 +29,36 @@ typedef enum
 struct Node
 {
     double *data;
-    struct Node* next;
+    struct Node *next;
 };
 
+//Leert den Eingabepuffer
 void clean_stdin(void)
 {
     int c;
-    do {
+    do
+    {
         c = getchar();
-    } while (c != '\n' && c != EOF);
+    }
+    while (c != '\n' && c != EOF);
+}
+
+//Eigene Impelemtation von strdup da die Funktion nicht im c99 Standard enthalten ist
+char *strdup(const char *str)
+{
+    int n = strlen(str) + 1;
+    char *dup = malloc(n);
+    if(dup)
+    {
+        strcpy(dup, str);
+    }
+    return dup;
 }
 
 //Fügt einer verketteten Liste ein Element am Ende hinzu
-void append(struct Node** head_ref, double* new_data)
+void append(struct Node **head_ref, double *new_data)
 {
-    struct Node* new_node = (struct Node*) malloc(sizeof(struct Node));
+    struct Node *new_node = (struct Node *) malloc(sizeof(struct Node));
     struct Node *last = *head_ref;
 
     new_node->data  = new_data;
@@ -69,10 +82,10 @@ void append(struct Node** head_ref, double* new_data)
 
 //Holt das nte Elemente einer verketteten Liste von hinten
 //ACHTUNG: Letztes Element wird über 1 geholt und nicht 0
-double* getNthFromLast(struct Node* head, int n)
+double *get_Nth_from_last(struct Node *head, int n)
 {
     int len = 0, i;
-    struct Node* temp = head;
+    struct Node *temp = head;
 
     while (temp != NULL)
     {
@@ -81,9 +94,7 @@ double* getNthFromLast(struct Node* head, int n)
     }
 
     if (len < n)
-    {
         return NULL;
-    }
 
     temp = head;
 
@@ -96,24 +107,20 @@ double* getNthFromLast(struct Node* head, int n)
 }
 
 //Gibt Elemente einer verketteten Liste aus
-void printList(struct Node *node, int size, bool onlyPrintLast)
+void print_list(struct Node *node, int size, bool only_print_last)
 {
     int count = 1;
     while (node != NULL)
     {
         for(int i = 0; i < size; i++)
         {
-            if(!onlyPrintLast)
-            {
+            if(!only_print_last)
                 printf("%2d: %10.10f\t", count, node->data[i]);
-            }
             else if(node->next == NULL)
-            {
                 printf("%2d: %10.10f\t", count, node->data[i]);
-            }
         }
 
-        if(!onlyPrintLast)
+        if(!only_print_last)
             printf("\n");
 
         count++;
@@ -123,7 +130,7 @@ void printList(struct Node *node, int size, bool onlyPrintLast)
 
 //Zählt die Anzahl der Reihen einer Datei. Ignoriert leere Zeilen
 //End Of Line muss immer \n sein. Kann bei Notepad erstellten csv Dateien zu Problemen kommen
-int countRows(const char *filename)
+int count_rows(const char *filename)
 {
     FILE *file;
     if((file = fopen(filename, "r")) == NULL)
@@ -153,7 +160,7 @@ int countRows(const char *filename)
 }
 
 //Entfernt Leerzeichen am Anfang und Ende eines Strings
-char *trimwhitespace(char *str)
+char *trim_whitespace(char *str)
 {
     char *end;
 
@@ -184,7 +191,7 @@ char *trimwhitespace(char *str)
 bool load(const char *filename, Matrix *A, Vector *b, Vector *x)
 {
     //Anzahl der Rows bestimmen und Größe der structs definieren
-    int rows = countRows(filename);
+    int rows = count_rows(filename);
 
     if(rows == 0)
     {
@@ -215,7 +222,7 @@ bool load(const char *filename, Matrix *A, Vector *b, Vector *x)
 
     //Datei lesen
     int i = 0;
-    int buffer = 8192; //8KB
+    int buffer = 16384; //16KB
     char line[buffer];
     while (fgets(line, buffer, file))
     {
@@ -227,7 +234,7 @@ bool load(const char *filename, Matrix *A, Vector *b, Vector *x)
         //Initialisieren und ersten Abschnitt erstellen
         ptr = strtok(line, delimiter);
 
-        //Wenn Zeile leer dann weiter
+        //Wenn Zeile leer, dann weiter
         if(strcmp(tmp, "\n") == 0)
         {
             free(tmp);
@@ -238,23 +245,35 @@ bool load(const char *filename, Matrix *A, Vector *b, Vector *x)
 
         while(ptr != NULL)
         {
+            char *endptr = NULL;
             if(j < A->n)
             {
-                A->data[i][j] = atof(trimwhitespace(ptr));
+                A->data[i][j] = strtod(ptr, &endptr);
             }
             else if(j < b->n + 1)
             {
-                b->data[i] = atof(trimwhitespace(ptr));
+                b->data[i] = strtod(ptr, &endptr);
                 //Falls der x Eintrag fehlt
                 x->data[i] = 0;
             }
             //Wird nur aufgerufen wenn x Eintrag vorhanden da sonst while Schleife durch Null Pointer abgebrochen wird
             else if(j < x->n + 2)
             {
-                x->data[i] = atof(trimwhitespace(ptr));
+                x->data[i] = strtod(ptr, &endptr);
             }
 
             j++;
+
+            endptr = trim_whitespace(endptr);
+
+            if (!*endptr == 0)
+            {
+                if (!isspace((unsigned char)*endptr))
+                {
+                    printf("Ein Wert konnte nicht richtig eingelesen werden: %s.\n", ptr);
+                    return false;
+                }
+            }
 
             //Nächsten Abschnitt erstellen
             ptr = strtok(NULL, delimiter);
@@ -269,34 +288,58 @@ bool load(const char *filename, Matrix *A, Vector *b, Vector *x)
     return true;
 }
 
-//Berechnung durch das Gauß-Seidel Verfahren
-struct Node* gauss_seidel_method(Matrix *A, Vector *b, Vector *x, double e)
+//Gibt an ob die Fehlerschranke unterschritten wurde
+bool is_smaller_error(struct Node *node, int n, double e)
 {
-    //Verkette Liste mit Rückgabewert
-    struct Node* head = NULL;
-    //Vektor zum berechnen von Zwischenergebnisen
-    double *dx = (double*) calloc(A->n,sizeof(double));
-    //Zählvariable für Durchläufe
-    int iterations = 0;
-
     double error = 0.0;
+    double *last = get_Nth_from_last(node, 1);
+    double *next_to_last = get_Nth_from_last(node, 2);
+
+    if(next_to_last != NULL)
+    {
+        for(int i = 0; i < n; i++)
+        {
+            error = MAX(error, fabs(last[i] - next_to_last[i]));
+        }
+    }
+    else //Wird bei erstem Schleifendurchlauf verwendet
+    {
+        for(int i = 0; i < n; i++)
+        {
+            error = MAX(error, fabs(last[i]));
+        }
+    }
+
+    if(error < e)
+        return true;
+    else
+        return false;
+}
+
+//Berechnung durch das Gauß-Seidel Verfahren
+struct Node *gauss_seidel_method(Matrix *A, Vector *b, Vector *x, double e)
+{
+    //Verkette Liste die die einzelnen Iterationsschritte enthält
+    struct Node *head = NULL;
+    //Vektor zum speichern von Zwischenergebnissen
+    double *dx = (double *) calloc(A->n, sizeof(double));
+    int iterations = 0;
 
     for(iterations = 0; iterations < 100; iterations++)
     {
-        error = 0.0;
         //Berechnung des Iterationsvektors
         for(int i = 0; i < A->n; i++)
         {
             dx[i] = b->data[i];
             for(int j = 0; j < A->n; j++)
             {
-                dx[i] -= A->data[i][j]*x->data[j];
+                dx[i] -= A->data[i][j] * x->data[j];
             }
             dx[i] /= A->data[i][i];
             x->data[i] += dx[i];
             if(isnan(x->data[i]))
             {
-                printf("Bei der Berechnung ist ein Wert NaN.\n");
+                printf("Bei der Berechnung wurde ein Wert ungeültig (NaN).\n");
                 return NULL;
             }
         }
@@ -310,53 +353,32 @@ struct Node* gauss_seidel_method(Matrix *A, Vector *b, Vector *x, double e)
         }
         append(&head, tmp);
 
-        //Rechnet den Fehler aus dem vorgegangenen Vektor
-        if(iterations > 0)
-        {
-            double* last = getNthFromLast(head, 1);
-            double* nexttolast = getNthFromLast(head, 2);
-            for(int i = 0; i < x->n; i++)
-            {
-                error = MAX(error, fabs(last[i] - nexttolast[i]));
-            }
-        }
-        else //Wird bei erstem Schleifendurchlauf verwendet
-        {
-            for(int i = 0; i < x->n; i++)
-            {
-                error = MAX(error, fabs(x->data[i]));
-            }
-        }
-
-        //Wenn Fehler kleiner Fehlerschranke wird Algo beendet
-        if(error < e)
-        {
+        if(is_smaller_error(head, x->n, e))
             break;
-        }
     }
 
     free(dx);
     return head;
 }
 
-
-struct Node* jacobi_method(Matrix *A, Vector *b, Vector *x, double e)
+//Berechnung durch das Jacobi Verfahren
+struct Node *jacobi_method(Matrix *A, Vector *b, Vector *x, double e)
 {
-    struct Node* head = NULL;
-    double *dx = (double*) calloc(x->n, sizeof(double));
-    double *y = (double*) calloc(x->n, sizeof(double));
+    //Verkette Liste die die einzelnen Iterationsschritte enthält
+    struct Node *head = NULL;
+    //Vektoren zum speichern von Zwischenergebnissen
+    double *dx = (double *) calloc(x->n, sizeof(double));
+    double *y = (double *) calloc(x->n, sizeof(double));
     int iterations = 0;
-    double error = 0.0;
 
     for(iterations = 0; iterations < 100; iterations++)
     {
-        error = 0;
         for(int i = 0; i < x->n; i++)
         {
             dx[i] = b->data[i];
             for(int j = 0; j < x->n; j++)
             {
-                dx[i] -= A->data[i][j]*x->data[j];
+                dx[i] -= A->data[i][j] * x->data[j];
             }
             dx[i] /= A->data[i][i];
             y[i] += dx[i];
@@ -370,7 +392,6 @@ struct Node* jacobi_method(Matrix *A, Vector *b, Vector *x, double e)
                 printf("Bei der Berechnung ist ein Wert NaN.\n");
                 return NULL;
             }
-
         }
 
         //Speichert Vektor in die verkettete Liste
@@ -382,30 +403,8 @@ struct Node* jacobi_method(Matrix *A, Vector *b, Vector *x, double e)
         }
         append(&head, tmp);
 
-        //Rechnet den Fehler aus dem vorgegangenen Vektor
-        if(iterations > 0)
-        {
-            double* last = getNthFromLast(head, 1);
-            double* nexttolast = getNthFromLast(head, 2);
-            for(int i = 0; i < x->n; i++)
-            {
-                error = MAX(error, fabs(last[i] - nexttolast[i]));
-            }
-        }
-        else //Wird bei erstem Schleifendurchlauf verwendet
-        {
-            for(int i = 0; i < x->n; i++)
-            {
-                error = MAX(error, fabs(x->data[i]));
-            }
-        }
-
-        //Wenn Fehler kleiner Fehlerschranke wird Algo beendet
-        if(error < e)
-        {
+        if(is_smaller_error(head, x->n, e))
             break;
-        }
-
     }
 
     free(dx);
@@ -415,9 +414,9 @@ struct Node* jacobi_method(Matrix *A, Vector *b, Vector *x, double e)
 }
 
 
-struct Node* solve(Method method, Matrix *A, Vector *b, Vector *x, double e)
+struct Node *solve(Method method, Matrix *A, Vector *b, Vector *x, double e)
 {
-    struct Node* solution = NULL;
+    struct Node *solution = NULL;
 
     if(method == JACOBI)
     {
@@ -429,26 +428,52 @@ struct Node* solve(Method method, Matrix *A, Vector *b, Vector *x, double e)
     }
     else
     {
-        printf("Fehler! Keine gueltige Methode angegeben");
+        printf("Fehler! Keine gueltige Methode angegeben.\n");
     }
 
     return solution;
 }
 
-bool exitApplication(char* input)
+//Prüft String ob Applikation verlassen werden soll
+bool exit_application(char *s)
 {
-    return strcmp(input, "EXIT") == 0 ? true : false;
+    return strcmp(s, "EXIT") == 0 ? true : false;
 }
 
-int isNumeric (char* s)
+//Prüft ob String eine Zahl ist
+int is_numeric (char *s)
 {
     if (s == NULL || *s == '\0' || isspace(*s))
     {
         return 0;
     }
-    char * p;
+    char *p;
     strtod (s, &p);
     return *p == '\0';
+}
+
+//Überprüft ob String Ja oder Nein ist. (Für Entscheidungen des Users)
+int is_yes_no(char *s)
+{
+    int i = 0;
+    while (s[i])
+    {
+        s[i] = toupper(s[i]);
+        i++;
+    }
+
+    if(strcmp(s, "JA") == 0)
+    {
+        return 1;
+    }
+    else if(strcmp(s, "NEIN") == 0)
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 int main()
@@ -458,29 +483,28 @@ int main()
     Vector x;
 
     bool success = false;
-    struct Node* solution = NULL;
+    struct Node *solution = NULL;
 
     printf("Programmieren 1 - Loesen von linearen Gleichungssystemen durch Gauss-Seidel oder Jakobi.\n");
     printf("Applikation kann durch Eingabe von \"EXIT\" beendet werden.\n\n");
 
     do
     {
-
-
         //Eingabe Filename
         char filename[255];
         printf("Bitte den Namen der CSV Datei eingeben\n");
-        bool filenameValid = false;
+        bool filename_valid = false;
         do
         {
             scanf("%s", filename);
 
-            if(exitApplication(filename))
+            if(exit_application(filename))
                 return 0;
 
+            //Prüft ob Datei und Leseberechtigung vorhanden
             if(access(filename, F_OK|R_OK) != -1)
             {
-                filenameValid = true;
+                filename_valid = true;
             }
             else
             {
@@ -490,7 +514,7 @@ int main()
             clean_stdin();
 
         }
-        while(!filenameValid);
+        while(!filename_valid);
 
         printf("\n");
 
@@ -498,23 +522,22 @@ int main()
         Method method;
         printf("Bitte Verfahren zur Berechnung angeben.\n");
         printf("0 = Jakobi Verfahren, 1 = Gauss-Seidel Verfahren\n");
-        bool methodValid = false;
+        bool method_valid = false;
         do
         {
             char input[255];
 
             scanf("%s", input);
 
-            if(exitApplication(input))
+            if(exit_application(input))
                 return 0;
 
+            int input_number = atoi(input);
 
-            int inputNumber = atoi(input);
-
-            if((inputNumber == 0 || inputNumber == 1) && isNumeric(input) != 0)
+            if((input_number == 0 || input_number == 1) && is_numeric(input) != 0)
             {
-                method = inputNumber;
-                methodValid = true;
+                method = input_number;
+                method_valid = true;
             }
             else
             {
@@ -524,26 +547,26 @@ int main()
             clean_stdin();
 
         }
-        while (!methodValid);
+        while (!method_valid);
 
         printf("\n");
 
         //Eingabe Fehlerschranke
         double error;
         printf("Bitte eine Fehlerschranke eingeben.\n");
-        bool errorValid = false;
+        bool error_valid = false;
         do
         {
             char input[255];
             scanf("%s", input);
 
-            if(exitApplication(input))
+            if(exit_application(input))
                 return 0;
 
-            if(isNumeric(input) != 0)
+            if(is_numeric(input) != 0)
             {
                 error = atof(input);
-                errorValid = true;
+                error_valid = true;
             }
             else
             {
@@ -553,14 +576,14 @@ int main()
             clean_stdin();
 
         }
-        while(!errorValid);
+        while(!error_valid);
 
         printf("\n");
 
         //Lädt CSV Datei
-        bool loadSuccess = load(filename, &A, &b, &x);
+        bool load_success = load(filename, &A, &b, &x);
 
-        if (loadSuccess)
+        if (load_success)
         {
             printf("CSV-Datei erfolgreich geladen.\n");
 
@@ -572,44 +595,36 @@ int main()
             {
                 printf("Berechnung erfolgreich.\n\nGesamte Loesungsvektoren ausgeben (Ja/Nein)? Bei Nein wird nur der letzte Vektor ausgegeben.\n");
 
-                bool outputValid = false;
+                bool output_valid = false;
 
                 do
                 {
                     char input[255];
                     scanf("%s", input);
 
-                    if(exitApplication(input))
+                    if(exit_application(input))
                         return 0;
 
-                    int i = 0;
 
-                    while (input[i])
+                    switch(is_yes_no(input))
                     {
-                        input[i] = toupper(input[i]);
-                        i++;
-                    }
-
-                    if(strcmp(input, "JA") == 0)
-                    {
-                        printList(solution, x.n, false);
-                        outputValid = true;
-                    }
-                    else if(strcmp(input, "NEIN") == 0)
-                    {
-                        printList(solution, x.n, true);
-                        outputValid = true;
+                    case 1:
+                        print_list(solution, x.n, false);
+                        output_valid = true;
+                        break;
+                    case 0:
+                        print_list(solution, x.n, true);
+                        output_valid = true;
                         printf("\n");
-                    }
-                    else
-                    {
+                        break;
+                    default:
                         printf("Eingabe wurde nicht erkannt.\n");
                     }
 
                     clean_stdin();
-                }
-                while(!outputValid);
 
+                }
+                while(!output_valid);
             }
             else
             {
@@ -624,53 +639,44 @@ int main()
         printf("\n");
 
         //Abfrage ob bei Fehler die Eingabe wiederholt werden soll
-        if(loadSuccess && solution != NULL)
+        if(load_success && solution != NULL)
         {
             success = true;
         }
         else
         {
             printf("Fehler beim Laden oder Berechnen.\n");
-            printf("Neue Eingabe (Ja/Nein)?\n");
+            printf("Neue Eingabe? (Ja/Nein)\n");
 
-            bool outputValid = false;
+            bool output_valid = false;
 
             do
             {
                 char input[255];
                 scanf("%s", input);
 
-                if(exitApplication(input))
+                if(exit_application(input))
                     return 0;
 
-                int i = 0;
-
-                while (input[i])
+                switch(is_yes_no(input))
                 {
-                    input[i] = toupper(input[i]);
-                    i++;
-                }
-
-                if(strcmp(input, "JA") == 0)
-                {
+                case 1:
                     printf("\n");
-                    outputValid = true;
-                }
-                else if(strcmp(input, "NEIN") == 0)
-                {
+                    output_valid = true;
+                    break;
+                case 0:
                     success = true;
-                    outputValid = true;
+                    output_valid = true;
                     printf("\n");
-                }
-                else
-                {
+                    break;
+                default:
                     printf("Eingabe wurde nicht erkannt.\n");
                 }
 
                 clean_stdin();
 
             }
-            while(!outputValid);
+            while(!output_valid);
         }
 
     }
