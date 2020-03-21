@@ -23,3 +23,13 @@
 	<unistd.h>
 	<ctype.h>
 
+1584793253 source:c:\uni\inf19ab\semester_1\programmieren\prog1\main.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<math.h>
+	<stdbool.h>
+	<assert.h>
+	<unistd.h>
+	<ctype.h>
+

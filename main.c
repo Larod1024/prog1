@@ -135,7 +135,7 @@ int count_rows(const char *filename)
     FILE *file;
     if((file = fopen(filename, "r")) == NULL)
     {
-        printf("Datei konnte nicht geöffnet werden");
+        printf("Datei konnte nicht geoeffnet werden");
         return 0;
     };
 
@@ -207,7 +207,7 @@ bool load(const char *filename, Matrix *A, Vector *b, Vector *x)
     FILE *file;
     if((file = fopen(filename, "r")) == NULL)
     {
-        printf("Datei konnte nicht geöffnet werden!");
+        printf("Datei konnte nicht geoeffnet werden!");
         return false;
     };
 
@@ -266,7 +266,7 @@ bool load(const char *filename, Matrix *A, Vector *b, Vector *x)
 
             endptr = trim_whitespace(endptr);
 
-            if (!*endptr == 0)
+            if (!(*endptr == 0))
             {
                 if (!isspace((unsigned char)*endptr))
                 {
@@ -339,7 +339,7 @@ struct Node *gauss_seidel_method(Matrix *A, Vector *b, Vector *x, double e)
             x->data[i] += dx[i];
             if(isnan(x->data[i]))
             {
-                printf("Bei der Berechnung wurde ein Wert ungeültig (NaN).\n");
+                printf("Bei der Berechnung wurde ein Wert ungeueltig (NaN).\n");
                 return NULL;
             }
         }
